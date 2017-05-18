@@ -5,10 +5,16 @@
 
         <title>Adolfo</title>
         <!-- Babylon.js -->
-        <script src="http://www.babylonjs.com/hand.minified-1.2.js"></script>
         <script src="http://www.babylonjs.com/cannon.js"></script>
         <script src="http://www.babylonjs.com/oimo.js"></script>
-        <script src="http://www.babylonjs.com/babylon.js"></script>
+        <script src="jquery.min.js"></script>
+        <!-- Latest compiled and minified CSS -->
+        <link rel="stylesheet" href="bootstrap.min.css">
+
+        <script src="bootstrap.min.js"></script>
+        
+
+        <script src="babylon.js"></script>
         <script src="water.js"></script>
         <style>
             html, body {
@@ -27,21 +33,97 @@
         </style>
     </head>
 <body>
+    <div class="panel panel-default">
+        <div class="panel-body">
+            <button class="btn btn-primary" data-toggle="collapse" data-target="#demo">Mostrar Instrucciones</button>
+            Adolfo Morales 13014 - Proyecto Grua
+        </div>
+        <div id="demo" class="collapse">
+            <div class="panel-footer" style="width: 310px; height: 120px; float: left;">
+                1 - Selecciona el barco <br>
+                2 - Selecciona la mano de la grua<br>
+                3 - Selecciona la cabecera de la grua<br>
+            </div>
+            <div class="panel-footer" style="width: 310px; height: 120px; float: left;">
+                Barco <br>
+                A - Girar a la derecha<br>
+                D - Girar a la izquierda<br>
+                S - Mover barco hacia delante<br>
+                W - Mover barco hacia atras<br>
+            </div>
+            <div class="panel-footer" style="width: 310px; height: 120px; float: left;">
+                Mano de la grua <br>
+                A - Girar a la derecha<br>
+                D - Girar a la izquierda<br>
+                S - Mover grua hacia arriba<br>
+                W - Mover grua hacia abajo<br>
+            </div>
+            <div class="panel-footer" style="width: 310px; height: 120px; float: left;">
+                Cabecera de la grua <br>
+                A - Girar a la derecha<br>
+                D - Girar a la izquierda<br>
+                S - Encoger brazo de grua<br>
+                W - Alargar brazo de grua<br>
+            </div>
+            <div class="panel-footer" style="width: 310px; height: 120px; float: left;">
+                Camara y Contenedor <br>
+                P - Cambiar de camara<br>
+                Espacio - Tomar y soltar contenedores<br>
+            </div>
+        </div>
+    </div>
     <div id="canvasZone">
         <canvas id="renderCanvas"></canvas>
     </div>
     <script>
         var canvas = document.getElementById("renderCanvas");
         var engine = new BABYLON.Engine(canvas, true);
+        var elements = [];
+        var containersKeys = ['Container_11', 'Container_5', 'Container_6', 'container1', 'Container_12', 'Container_4'];
+        var elementsIndex = ['Crane', 'Boat_and_Crane', containersKeys];
+        var actualElement = 'boat';
+        var boatState = {'containers': []};
+        var craneState = {'holding': false, 'container': undefined, 'containerRotation': true };
+        var cameras = [];
+        var toggleCamera = 0;
 
         var createScene = function () {
         	var scene = new BABYLON.Scene(engine);
+            scene.gravity = new BABYLON.Vector3(0, -9.81, 0);
         
         	var camera = new BABYLON.ArcRotateCamera("Camera", 3 * Math.PI / 2, Math.PI / 4, 100, BABYLON.Vector3.Zero(), scene);
         	camera.attachControl(canvas, true);
-        
+            camera.applyGravity = true;
+            cameras.push(camera);
+
         	var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);
-        	
+
+            BABYLON.SceneLoader.ImportMesh(
+                "","","craneboat.babylon",
+                scene,
+                function(newMeshes) {
+                    newMeshes.forEach(
+                        function(mesh) {
+                            mesh.checkCollisions = true;
+                            elements.push(mesh);
+                        }
+                    );
+                }
+            );
+
+            var camera2 = new BABYLON.FreeCamera("FreeCamera", new BABYLON.Vector3(3, 2, -14.5), scene);
+            camera2.rotation = new BABYLON.Vector3(-2.5, 4.5, -5);
+            camera2.parent = elements.filter(
+                function (item) {
+                    return item.id === "Boat_and_Crane";
+                }
+            )[0];
+            cameras.push(camera2);
+
+            var camera3 = new BABYLON.FreeCamera("FreeCamera", new BABYLON.Vector3(21.5, 9, 5.5), scene);
+            camera3.rotation = new BABYLON.Vector3(0, 9.5, 0);
+            cameras.push(camera3);
+
         	// Skybox
         	var skybox = BABYLON.Mesh.CreateBox("skyBox", 1000.0, scene);
             var skyboxMaterial = new BABYLON.StandardMaterial("skyBox", scene);
@@ -52,15 +134,16 @@
         	skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
         	skyboxMaterial.disableLighting = true;
         	skybox.material = skyboxMaterial;
-        		
-        	// Ground
-        	var groundMaterial = new BABYLON.StandardMaterial("groundMaterial", scene);
-        	groundMaterial.diffuseTexture = new BABYLON.Texture("textures/ground.jpg", scene);
-        	groundMaterial.diffuseTexture.uScale = groundMaterial.diffuseTexture.vScale = 4;
-        	
-        	var ground = BABYLON.Mesh.CreateGround("ground", 512, 512, 32, scene, false);
-        	ground.position.y = -1;
-        	ground.material = groundMaterial;
+
+            var ground = BABYLON.Mesh.CreateGroundFromHeightMap("ground", "textures/heightMap.png", 512, 512, 32, -40, 10, scene, false);
+
+            var groundMaterial = new BABYLON.StandardMaterial("ground", scene);
+            groundMaterial.diffuseTexture = new BABYLON.Texture("textures/ground.jpg", scene);
+            groundMaterial.diffuseTexture.uScale = 4;
+            groundMaterial.diffuseTexture.vScale = 4;
+            groundMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+            //ground.position.y = -15.0;
+            ground.material = groundMaterial;
         		
         	// Water
         	var waterMesh = BABYLON.Mesh.CreateGround("waterMesh", 512, 512, 32, scene, false);
@@ -69,13 +152,13 @@
         	water.bumpTexture = new BABYLON.Texture("textures/waterbump.png", scene);
         	
         	// Water properties
-        	water.windForce = -15;
-        	water.waveHeight = 1.3;
+        	water.windForce = -20;
+        	water.waveHeight = 0.3;
         	water.windDirection = new BABYLON.Vector2(1, 1);
         	water.waterColor = new BABYLON.Color3(0.1, 0.1, 0.6);
         	water.colorBlendFactor = 0.3;
         	water.bumpHeight = 0.1;
-        	water.waveLength = 0.1;
+        	water.waveLength = 0.8;
         	
         	// Add skybox and ground to the reflection and refraction
         	water.addToRenderList(skybox);
@@ -83,12 +166,530 @@
         	
         	// Assign the water material
         	waterMesh.material = water;
+            waterMesh.position.y = -11.5;
         
+            scene.collisionsEnabled = true;
+            camera.checkCollisions = true;
+
+            ground.checkCollisions = true;
+            //waterMesh.checkCollisions = true;
+
+            scene.registerBeforeRender(function () {
+            });
+
         	return scene;
         }
         
         var scene = createScene();
 
+        var checkCollision = function() {
+            var boat = getBoat();
+            var isle = getIsle();
+            if (boat.intersectsMesh(isle, false)) {
+                console.log('collision');
+            }
+            
+            if (isle.intersectsMesh(boat, false)) {
+                console.log('collision');
+            }
+        }
+
+        var checkIsleBoatCollision = function(factor) {
+            var boat = getBoat();
+            var isle = getIsle();
+            var islePosition = isle.getAbsolutePosition();
+            var z1 = boat.getAbsolutePosition().z + factor;
+            var z2 = islePosition.z - 30;
+
+            return (z1 >= z2) ? true : false;
+        }
+
+        var moveBoat = function(element, moveVector) {
+            // Apply transformation with new vector3D
+            element.translate(moveVector, 1.0, BABYLON.Space.LOCAL);
+        };
+
+        var rotateBoat = function(element, vector, factor) {
+            // Apply transformation with new vector3D
+            element.rotate(vector, factor, BABYLON.Space.LOCAL);
+        };
+
+        var moveCrane = function(elements, moveVector, direction) {
+            elements.forEach(function(item) {
+                item.translate(moveVector, 1.0, BABYLON.Space.LOCAL);
+                if (direction === 'containerUp') {
+                    if (item.position.y >= 15.4966) {
+                        item.position.y = 15.4966;
+                    }
+                } else if (direction === 'containerDown') {
+                    if (item.position.y <= -7.503399999999999) {
+                        item.position.y = -7.503399999999999;
+                    }
+                } else if (direction === 'up') {
+                    //-0.5870999999999995
+                    if (item.position.y >= -0.5870999999999995) {
+                        item.position.y = -0.5870999999999995;
+                    }
+                } else if (direction === 'down') {
+                    // -23.5871
+                    var limitY = (boatState.containers.length >= 3) ? -20.4471 : -23.5871;
+                    if (item.position.y <= limitY) {
+                        item.position.y = limitY;
+                    }
+                }
+            });
+        }
+
+        var evalRange = function(type, eval, positions, offset, evalY) {
+            console.log('eval');
+            console.log(eval.x);
+            console.log(positions.x);
+            console.log('**********');
+            /*console.log('eval');
+            console.log(eval.x);
+            console.log(eval.y);
+            console.log(eval.z);
+            console.log('ranges');
+            console.log('X0: ' + (positions.x - offset) + ' x1: ' + (positions.x + offset));
+            console.log(positions.x - offset);
+            console.log(positions.x + offset);
+            console.log('Y0: ' + (positions.y - offset) + ' Y1: ' + (positions.y + offset));
+            console.log(positions.y - offset);
+            console.log(positions.y + offset);
+            console.log('Z0: ' + (positions.z - offset) + ' Z1: ' + (positions.z + offset));
+            console.log(positions.z - offset);
+            console.log(positions.z + offset);*/
+
+            if (type === 'containers') {
+                if ((eval.x - 4) >= (positions.x - offset) && (eval.x - 4) <= (positions.x + offset)) {
+                    if (eval.z >= (positions.z - offset) && eval.z <= (positions.z + offset)) {
+                        if (evalY) {
+                            if (eval.y >= (positions.y - 1.5) && eval.y <= (positions.y + 1.5)) {
+                                return true;
+                            }
+                            return false;
+                        }
+                        return true;
+                    }
+                    return false;
+                }
+                return false;
+            }
+
+            var evalExpr1 = ((positions.z + 2*offset) <= 0 ) ? eval.z >= positions.z : eval.z <= positions.z;
+            var evalExpr = ((positions.z + 2*offset) <= 0 ) ? (eval.z >= (positions.z + 2*offset)) : (eval.z <= (positions.z + 2*offset))
+            if (eval.x >= (positions.x - offset) && eval.x <= (positions.x + offset)) {
+                //if (eval.z <= positions.z && eval.z <= (positions.z + 2*offset)) {
+                if (eval.z <= positions.z && evalExpr) {
+                    if (evalY) {
+                        //console.log('Evaluate Y: ' + eval.y + ' >= ' + positions.y + ' && ' + eval.y + ' <= ' + (positions.y + 8));
+                        if (eval.y >= positions.y && eval.y <= (positions.y + 15)) {
+                            return true;
+                        }
+                        return false;
+                    }
+                    return true;
+                }
+                return false;
+            }
+            return false;
+        }
+
+        var getNextContainerPosInBoat = function(containers) {
+            switch(containers.length) {
+                case 0:
+                    return 2.5;
+                case 1:
+                    return -1.5;
+                case 2:
+                    return -5.5;
+                case 3:
+                    return 2.5;
+                case 4:
+                    return -1.5;
+                case 5:
+                    return -5.5;
+                default:
+                    return 0;
+            }
+        }
+
+        var getNextContainerPosInBoat_Y = function(containers) {
+            if (containers.length <= 2) {
+                return 3;
+            }
+            return 6;
+        }
+
+        var containerAction = function() {
+            var boat = getBoat();
+            var crain = getCraneCatcher()[0];
+            var containers = getContainers();
+            var containerToAction = undefined;
+            console.log(crain.position);
+            console.log(crain.getAbsolutePosition());
+            if (craneState.holding) {
+                var boatCollision = evalRange('boat', crain.getAbsolutePosition(), boat.getAbsolutePosition(), 5, true);
+                console.log('boatCollision: ' + boatCollision);
+                if (boatCollision) {
+                    rotateBoat(craneState.container, BABYLON.Axis.Y, 80.15);
+                    //craneState.rotationY = 0;
+                    craneState.holding = false;
+                    craneState.container.parent = getBoat();
+                    craneState.container.position.x = getNextContainerPosInBoat(boatState.containers);
+                    craneState.container.position.y = getNextContainerPosInBoat_Y(boatState.containers);
+                    craneState.container.position.z = -6.5;
+                    boatState.containers.push(craneState.container);
+                    craneState.container = undefined;
+                    craneState.containerRotation = true;
+                }
+            }
+
+            if (!craneState.holding) {
+                //console.log(containers);
+                containers.some(function (value, index, _ary) {
+                    var containerCollision = evalRange('containers', crain.getAbsolutePosition(), value.getAbsolutePosition(), 2, true);
+                    //console.log('container collision: ' + containerCollision + ' with ' + value.id);
+                    if (containerCollision) {
+                        containerToAction = value;
+                    }
+                    return containerCollision;
+                });
+                if (containerToAction !== undefined) {
+                    craneState.container = containerToAction;
+                    craneState.holding = true;
+                }
+            }
+           // console.log(craneState);
+        }
+
+        var getContainers = function() {
+            return elements.filter(
+                function(item) {
+                    return containersKeys.indexOf(item.id) > -1 
+                }
+            );
+        }
+
+        var getBoat = function() {
+            return elements.filter(
+                function (item) {
+                    return item.id === "Boat_and_Crane";
+                }
+            )[0];
+        }
+
+        var getCrane = function() {
+            return elements.filter(
+                function (item) {
+                    return item.id === "Crane";
+                }
+            )[0];
+        }
+
+        var getIsle = function() {
+            return elements.filter(
+                function (item) {
+                    return item.id === "Isle";
+                }
+            )[0];
+        }
+
+        var getCraneCatcher = function() {
+            return [
+                elements.filter(
+                    function (item) {
+                        return item.id === "Claw";
+                    }
+                )[0]
+            ];
+        }
+
+        var getCraneCatcherStickers = function() {
+            return [
+                elements.filter(
+                    function (item) {
+                        return item.id === "Box24";
+                    }
+                )[0],
+                elements.filter(
+                    function (item) {
+                        return item.id === "Box38";
+                    }
+                )[0],
+                elements.filter(
+                    function (item) {
+                        return item.id === "Cylinder3";
+                    }
+                )[0]
+            ];
+        }
+        
+        // On key up, reset the movement
+        var first = true;
+        var onKeyDown = function(evt) {
+            if (evt.keyCode == 65) {
+                if (actualElement === 'boat') {
+                    var transVector = new BABYLON.Vector3(-1, 0, 0);
+                    rotateBoat(getBoat(), BABYLON.Axis.Y, 0.1);
+                } else if (actualElement === 'crane') {
+                    rotateBoat(getCrane(), BABYLON.Axis.Y, 0.1);
+                    if (craneState.holding) {
+                        console.log(getCraneCatcher()[0]);
+                        //console.log(getCraneCatcher()[0].getAbsolutePosition());
+                        //console.log(getCraneCatcher()[0].position);
+                        //console.log(craneState.container.getAbsolutePosition());
+                        //console.log(craneState.container.getAbsolutePosition().x - getCraneCatcher()[0].getAbsolutePosition().x);
+
+                        /*craneState.container.position.x = 14.319636344909668;
+                        craneState.container.position.y = 10.782999992370605 - 1.5;
+                        craneState.container.position.z = 4.930439472198486;*/
+                        craneState.container.parent = getCraneCatcher()[0];
+                        craneState.container.position.x = getCrane().getAbsolutePosition().x - 21.93157730488419;
+                        // 12, 9.5
+                        // 12 - 10.782999992370605
+                        // 9.5 - 7.7829999923706055
+                        // 6.5 - 4.7829999923706055
+                        var cranePosition = getCraneCatcher()[0].getAbsolutePosition();
+                        if (cranePosition.y > 9.782999992370605 && cranePosition.y < 11.782999992370605) {
+                            craneState.container.position.y = getCraneCatcher()[0].getAbsolutePosition().y - 12;
+                        } else if (cranePosition.y > 6.782999992370605 && cranePosition.y < 8.782999992370605) {
+                            craneState.container.position.y = getCraneCatcher()[0].getAbsolutePosition().y - 9.5;
+                        } else if (cranePosition.y > 3.782999992370605 && cranePosition.y < 5.782999992370605) {
+                            craneState.container.position.y = getCraneCatcher()[0].getAbsolutePosition().y - 6.5;
+                        }
+                        if (craneState.containerRotation) {
+                            rotateBoat(craneState.container, BABYLON.Axis.Y, -17.3);
+                            craneState.container.position.z = craneState.container.position.z - 1.5;
+                            craneState.containerRotation = false;
+                        }
+                        /*craneState.container.position = new BABYLON.Vector3(
+                            getCraneCatcher()[0].getAbsolutePosition().x - 21.93157730488419,
+                            //getCraneCatcher()[0].getAbsolutePosition().x - 31.93157730488419,
+                            getCraneCatcher()[0].getAbsolutePosition().y - 1.5,
+                            getCraneCatcher()[0].getAbsolutePosition().z
+                        );*/
+                        //craneState.container.rotationX = 0;
+                    }
+                } else if (actualElement === 'crane_catcher') {
+                    if (first) {
+                        getCraneCatcher()[0].position = new BABYLON.Vector3(getCraneCatcher()[0].position.x, getCraneCatcher()[0].position.y, -11.5);
+                        first = false;
+                    }
+                    // set pivot
+                    getCraneCatcher()[0].setPivotMatrix(
+                        BABYLON.Matrix.Translation(
+                            0,
+                            0,
+                            -4.25
+                        )
+                    );
+                    // compensate shifting
+                    getCraneCatcher()[0].position = new BABYLON.Vector3(
+                        getCraneCatcher()[0].position.x,
+                        getCraneCatcher()[0].position.y,
+                        getCraneCatcher()[0].position.z
+                    );
+                    rotateBoat(getCraneCatcher()[0], BABYLON.Axis.Y, Math.PI / 12);
+                    if (craneState.holding) {
+                        rotateBoat(craneState.container, BABYLON.Axis.Y, Math.PI / 12);
+                    }
+                }
+            } else if (evt.keyCode == 68) {
+                if (actualElement === 'boat') {
+                    var transVector = new BABYLON.Vector3(1, 0, 0);
+                    rotateBoat(getBoat(), BABYLON.Axis.Y, -0.1);   
+                } else if (actualElement === 'crane') {
+                    rotateBoat(getCrane(), BABYLON.Axis.Y, -0.1);
+                    if (craneState.holding) {
+                        console.log(getCraneCatcher()[0]);
+                        //console.log(getCraneCatcher()[0].getAbsolutePosition());
+                        //console.log(getCraneCatcher()[0].position);
+                        //console.log(craneState.container.getAbsolutePosition());
+                        //console.log(craneState.container.getAbsolutePosition().x - getCraneCatcher()[0].getAbsolutePosition().x);
+
+                        /*craneState.container.position.x = 14.319636344909668;
+                        craneState.container.position.y = 10.782999992370605 - 1.5;
+                        craneState.container.position.z = 4.930439472198486;*/
+                        craneState.container.parent = getCraneCatcher()[0];
+                        craneState.container.position.x = getCrane().getAbsolutePosition().x - 21.93157730488419;
+                        var cranePosition = getCraneCatcher()[0].getAbsolutePosition();
+                        if (cranePosition.y > 9.782999992370605 && cranePosition.y < 11.782999992370605) {
+                            craneState.container.position.y = getCraneCatcher()[0].getAbsolutePosition().y - 12;
+                        } else if (cranePosition.y > 6.782999992370605 && cranePosition.y < 8.782999992370605) {
+                            craneState.container.position.y = getCraneCatcher()[0].getAbsolutePosition().y - 9.5;
+                        } else if (cranePosition.y > 3.782999992370605 && cranePosition.y < 5.782999992370605) {
+                            craneState.container.position.y = getCraneCatcher()[0].getAbsolutePosition().y - 6.5;
+                        }
+                        if (craneState.containerRotation) {
+                            rotateBoat(craneState.container, BABYLON.Axis.Y, -17.3);
+                            craneState.container.position.z = craneState.container.position.z - 1.5;
+                            craneState.containerRotation = false;
+                        }
+                        /*craneState.container.position = new BABYLON.Vector3(
+                            getCraneCatcher()[0].getAbsolutePosition().x - 21.93157730488419,
+                            //getCraneCatcher()[0].getAbsolutePosition().x - 31.93157730488419,
+                            getCraneCatcher()[0].getAbsolutePosition().y - 1.5,
+                            getCraneCatcher()[0].getAbsolutePosition().z
+                        );*/
+                        //craneState.container.rotationX = 0;
+                    }
+                } else if (actualElement === 'crane_catcher') {
+                    if (first) {
+                        getCraneCatcher()[0].position = new BABYLON.Vector3(getCraneCatcher()[0].position.x, getCraneCatcher()[0].position.y, -11.5);
+                        first = false;
+                    }
+                    // set pivot
+                    getCraneCatcher()[0].setPivotMatrix(
+                        BABYLON.Matrix.Translation(
+                            0,
+                            0,
+                            -4.25
+                        )
+                    );
+                    // compensate shifting
+                    getCraneCatcher()[0].position = new BABYLON.Vector3(
+                        getCraneCatcher()[0].position.x,
+                        getCraneCatcher()[0].position.y,
+                        getCraneCatcher()[0].position.z
+                    );
+                    rotateBoat(getCraneCatcher()[0], BABYLON.Axis.Y, -Math.PI / 12);
+                    if (craneState.holding) {
+                        rotateBoat(craneState.container, BABYLON.Axis.Y, -Math.PI / 12);
+                    }
+                }
+            } else if (evt.keyCode == 87) {
+                if (actualElement === 'boat') {
+                    var transVector = new BABYLON.Vector3(0, 0, 1);
+                    var hasCollision = checkIsleBoatCollision(1);
+                    if (!hasCollision) {
+                        moveBoat(getBoat(), transVector);
+                    }
+                } else if (actualElement === 'crane') {
+                    var transVector = new BABYLON.Vector3(0, -1, 0);
+                    moveCrane(getCraneCatcher(), transVector, 'down');
+                    if (craneState.holding) {
+                        craneState.container.parent = getCraneCatcher()[0];
+                        craneState.container.position.x = getCrane().getAbsolutePosition().x - 21.93157730488419;
+                        //moveCrane([craneState.container], transVector, 'containerDown');
+                        //craneState.container.position.y = getCraneCatcher()[0].getAbsolutePosition().y - 12;
+                    }
+                } else if (actualElement === 'crane_catcher') {
+                    var stickers = getCraneCatcherStickers();
+                    stickers.forEach(function(e) {
+                        e.position = new BABYLON.Vector3(
+                            e.position.x,
+                            e.position.y,
+                            e.position.z - 1
+                        );
+                    });
+                    getCraneCatcher()[0].position = new BABYLON.Vector3(
+                        getCraneCatcher()[0].position.x,
+                        getCraneCatcher()[0].position.y,
+                        getCraneCatcher()[0].position.z - 1
+                    );
+                    if (craneState.holding) {
+                        craneState.container.position = new BABYLON.Vector3(
+                            craneState.container.position.x - 1,
+                            craneState.container.position.y,
+                            craneState.container.position.z
+                        );
+                    }
+                }
+            } else if (evt.keyCode == 83) {
+                if (actualElement === 'boat') {
+                    var transVector = new BABYLON.Vector3(0, 0, -1);
+                    var hasCollision = checkIsleBoatCollision(-1);
+                    if (!hasCollision) {
+                        moveBoat(getBoat(), transVector);
+                    }
+                } else if (actualElement === 'crane') {
+                    var transVector = new BABYLON.Vector3(0, 1, 0);
+                    moveCrane(getCraneCatcher(), transVector, 'up');
+                    if (craneState.holding) {
+                        craneState.container.parent = getCraneCatcher()[0];
+                        craneState.container.position.x = getCrane().getAbsolutePosition().x - 21.93157730488419;
+                        //craneState.container.position.y = getCraneCatcher()[0].getAbsolutePosition().y - 12;
+                        //moveCrane([craneState.container], transVector, 'containerUp');
+                        //craneState.container.position.y = getCraneCatcher()[0].getAbsolutePosition().y - 12;
+                    }
+                } else if (actualElement === 'crane_catcher') {
+                    var stickers = getCraneCatcherStickers();
+                    stickers.forEach(function(e) {
+                        e.position = new BABYLON.Vector3(
+                            e.position.x,
+                            e.position.y,
+                            e.position.z + 1
+                        );
+                    });
+                    getCraneCatcher()[0].position = new BABYLON.Vector3(
+                        getCraneCatcher()[0].position.x,
+                        getCraneCatcher()[0].position.y,
+                        getCraneCatcher()[0].position.z + 1
+                    );
+                    if (craneState.holding) {
+                        craneState.container.position = new BABYLON.Vector3(
+                            craneState.container.position.x + 1,
+                            craneState.container.position.y,
+                            craneState.container.position.z
+                        );
+                    }
+                }
+
+            // SpaceBar: (PickUp | PutDown) Containers
+            } else if (evt.keyCode == 32) {
+                containerAction();
+            // Key: 1 - Boat
+            } else if (evt.keyCode == 49) {
+                actualElement = 'boat';
+            // Key: 2 - Crane
+            } else if (evt.keyCode == 50) {
+                actualElement = 'crane';
+            // Key: 3 - CraneCatcher
+            } else if (evt.keyCode == 51) {
+                actualElement = 'crane_catcher';
+            
+            // Key: 
+            } else if (evt.keyCode == 80) {
+                console.log('Change Camera');
+                console.log(cameras);
+                toggleCamera++;
+                if (toggleCamera === 4) toggleCamera = 1;
+                switch (toggleCamera) {
+                    case 1:
+                        console.log('Set first camera');
+                        scene.activeCamera = cameras[1];
+                        cameras[1].attachControl(canvas);
+                        cameras[1].parent = getBoat();
+                        console.log(cameras[1].parent);
+                        break;
+                    case 2:
+                        console.log('Set second camera');
+                        scene.activeCamera = cameras[2];
+                        cameras[2].attachControl(canvas);
+                        break;
+                    case 3:
+                        console.log('Set third camera');
+                        scene.activeCamera = cameras[0];
+                        cameras[0].attachControl(canvas);
+                        break;
+                }
+            }
+        };
+
+        // On key up, reset the movement
+        var onKeyUp = function(evt) {
+        };
+
+        // Register events with the right Babylon function
+        BABYLON.Tools.RegisterTopRootEvents([{
+            name: "keydown",
+            handler: onKeyDown
+        }, {
+            name: "keyup",
+            handler: onKeyUp
+        }]);
+        
         engine.runRenderLoop(function () {
             scene.render();
         });
